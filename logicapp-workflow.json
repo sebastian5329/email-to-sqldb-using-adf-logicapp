@@ -1,0 +1,126 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "contentVersion": "1.0.0.0",
+        "triggers": {
+            "When_a_new_email_arrives_(V2)": {
+                "splitOn": "@triggerBody()?['value']",
+                "type": "ApiConnectionNotification",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['outlook']['connectionId']"
+                        }
+                    },
+                    "fetch": {
+                        "pathTemplate": {
+                            "template": "/v2/Mail/OnNewEmail"
+                        },
+                        "method": "get",
+                        "queries": {
+                            "to": "sebastianofficial07@outlook.com",
+                            "from": "sebastianofficial07@gmail.com",
+                            "importance": "Any",
+                            "fetchOnlyWithAttachment": true,
+                            "includeAttachments": true,
+                            "subjectFilter": "credit data",
+                            "folderPath": "Inbox"
+                        }
+                    },
+                    "subscribe": {
+                        "body": {
+                            "NotificationUrl": "@listCallbackUrl()"
+                        },
+                        "pathTemplate": {
+                            "template": "/MailSubscriptionPoke/$subscriptions"
+                        },
+                        "method": "post",
+                        "queries": {
+                            "importance": "Any",
+                            "fetchOnlyWithAttachment": true,
+                            "folderPath": "Inbox"
+                        }
+                    }
+                }
+            }
+        },
+        "actions": {
+            "For_each": {
+                "foreach": "@triggerBody()?['Attachments']",
+                "actions": {
+                    "Get_attachment": {
+                        "type": "ApiConnection",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['outlook']['connectionId']"
+                                }
+                            },
+                            "method": "get",
+                            "path": "/Mail/@{encodeURIComponent(triggerBody()?['Id'])}/Attachments/@{encodeURIComponent(items('For_each')?['Id'])}"
+                        }
+                    },
+                    "Create_blob_(V2)": {
+                        "runAfter": {
+                            "Get_attachment": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "ApiConnection",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['azureblob']['connectionId']"
+                                }
+                            },
+                            "method": "post",
+                            "body": "@base64ToBinary(item()?['ContentBytes'])",
+                            "headers": {
+                                "ReadFileMetadataFromServer": true
+                            },
+                            "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('AccountNameFromSettings'))}/files",
+                            "queries": {
+                                "folderPath": "/landing",
+                                "name": "@item()?['Name']",
+                                "queryParametersSingleEncoded": true
+                            }
+                        },
+                        "runtimeConfiguration": {
+                            "contentTransfer": {
+                                "transferMode": "Chunked"
+                            }
+                        }
+                    }
+                },
+                "runAfter": {},
+                "type": "Foreach"
+            }
+        },
+        "outputs": {},
+        "parameters": {
+            "$connections": {
+                "type": "Object",
+                "defaultValue": {}
+            }
+        }
+    },
+    "parameters": {
+        "$connections": {
+            "type": "Object",
+            "value": {
+                "outlook": {
+                    "id": "/subscriptions/fc48e5ac-7507-4f71-8257-3a3665196b7b/providers/Microsoft.Web/locations/centralindia/managedApis/outlook",
+                    "connectionId": "/subscriptions/fc48e5ac-7507-4f71-8257-3a3665196b7b/resourceGroups/cloud-dev-rs/providers/Microsoft.Web/connections/outlook",
+                    "connectionName": "outlook",
+                    "connectionProperties": {}
+                },
+                "azureblob": {
+                    "id": "/subscriptions/fc48e5ac-7507-4f71-8257-3a3665196b7b/providers/Microsoft.Web/locations/centralindia/managedApis/azureblob",
+                    "connectionId": "/subscriptions/fc48e5ac-7507-4f71-8257-3a3665196b7b/resourceGroups/cloud-dev-rs/providers/Microsoft.Web/connections/azureblob",
+                    "connectionName": "azureblob",
+                    "connectionProperties": {}
+                }
+            }
+        }
+    }
+}

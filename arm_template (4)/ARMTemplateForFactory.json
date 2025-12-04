@@ -1,0 +1,285 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "factoryName": {
+            "type": "string",
+            "metadata": "Data Factory name",
+            "defaultValue": "cloud-dev-adfws"
+        },
+        "ls_blob_connectionString": {
+            "type": "secureString",
+            "metadata": "Secure string for 'connectionString' of 'ls_blob'"
+        },
+        "ls_sqldb_password": {
+            "type": "secureString",
+            "metadata": "Secure string for 'password' of 'ls_sqldb'"
+        },
+        "ls_sqldb_properties_typeProperties_server": {
+            "type": "string",
+            "defaultValue": "cloudsqlserver01.database.windows.net"
+        },
+        "ls_sqldb_properties_typeProperties_database": {
+            "type": "string",
+            "defaultValue": "cloudsqldb01"
+        },
+        "ls_sqldb_properties_typeProperties_userName": {
+            "type": "string",
+            "defaultValue": "sebastian"
+        },
+        "tr_event_properties_pipeline1_parameters_pl_param_folder": {
+            "type": "string",
+            "defaultValue": "@triggerBody().folderPath"
+        },
+        "tr_event_properties_pipeline1_parameters_pl_param_file": {
+            "type": "string",
+            "defaultValue": "@triggerBody().fileName"
+        },
+        "tr_event_properties_typeProperties_scope": {
+            "type": "string",
+            "defaultValue": "/subscriptions/fc48e5ac-7507-4f71-8257-3a3665196b7b/resourceGroups/cloud-dev-rs/providers/Microsoft.Storage/storageAccounts/clouddevblob"
+        }
+    },
+    "variables": {
+        "factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+    },
+    "resources": [
+        {
+            "name": "[concat(parameters('factoryName'), '/ls_blob')]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "AzureBlobStorage",
+                "typeProperties": {
+                    "connectionString": "[parameters('ls_blob_connectionString')]"
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/ls_sqldb')]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "AzureSqlDatabase",
+                "typeProperties": {
+                    "server": "[parameters('ls_sqldb_properties_typeProperties_server')]",
+                    "database": "[parameters('ls_sqldb_properties_typeProperties_database')]",
+                    "encrypt": "mandatory",
+                    "trustServerCertificate": true,
+                    "authenticationType": "SQL",
+                    "userName": "[parameters('ls_sqldb_properties_typeProperties_userName')]",
+                    "password": {
+                        "type": "SecureString",
+                        "value": "[parameters('ls_sqldb_password')]"
+                    }
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/ds_blob')]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "ls_blob",
+                    "type": "LinkedServiceReference"
+                },
+                "parameters": {
+                    "ds_param_folder": {
+                        "type": "string"
+                    },
+                    "ds_param_file": {
+                        "type": "string"
+                    }
+                },
+                "annotations": [],
+                "type": "DelimitedText",
+                "typeProperties": {
+                    "location": {
+                        "type": "AzureBlobStorageLocation",
+                        "fileName": {
+                            "value": "@dataset().ds_param_file",
+                            "type": "Expression"
+                        },
+                        "container": {
+                            "value": "@dataset().ds_param_folder",
+                            "type": "Expression"
+                        }
+                    },
+                    "columnDelimiter": ",",
+                    "escapeChar": "\\",
+                    "firstRowAsHeader": true,
+                    "quoteChar": "\""
+                },
+                "schema": []
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/ls_blob')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/ds_sqldb')]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "ls_sqldb",
+                    "type": "LinkedServiceReference"
+                },
+                "annotations": [],
+                "type": "AzureSqlTable",
+                "schema": [],
+                "typeProperties": {
+                    "schema": "dbo",
+                    "table": "creditdata"
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/ls_sqldb')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/pipeline1')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "Copy data1",
+                        "type": "Copy",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "0.12:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "source": {
+                                "type": "DelimitedTextSource",
+                                "additionalColumns": [
+                                    {
+                                        "name": "file_name",
+                                        "value": {
+                                            "value": "@pipeline().parameters.pl_param_file",
+                                            "type": "Expression"
+                                        }
+                                    },
+                                    {
+                                        "name": "load_date",
+                                        "value": {
+                                            "value": "@convertFromUtc(utcnow(),'india standard time')",
+                                            "type": "Expression"
+                                        }
+                                    }
+                                ],
+                                "storeSettings": {
+                                    "type": "AzureBlobStorageReadSettings",
+                                    "recursive": true,
+                                    "enablePartitionDiscovery": false
+                                },
+                                "formatSettings": {
+                                    "type": "DelimitedTextReadSettings"
+                                }
+                            },
+                            "sink": {
+                                "type": "AzureSqlSink",
+                                "writeBehavior": "insert",
+                                "sqlWriterUseTableLock": false,
+                                "tableOption": "autoCreate",
+                                "disableMetricsCollection": false
+                            },
+                            "enableStaging": false,
+                            "translator": {
+                                "type": "TabularTranslator",
+                                "typeConversion": true,
+                                "typeConversionSettings": {
+                                    "allowDataTruncation": true,
+                                    "treatBooleanAsNumber": false
+                                }
+                            }
+                        },
+                        "inputs": [
+                            {
+                                "referenceName": "ds_blob",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "ds_param_folder": {
+                                        "value": "@pipeline().parameters.pl_param_folder",
+                                        "type": "Expression"
+                                    },
+                                    "ds_param_file": {
+                                        "value": "@pipeline().parameters.pl_param_file",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        ],
+                        "outputs": [
+                            {
+                                "referenceName": "ds_sqldb",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            }
+                        ]
+                    }
+                ],
+                "policy": {
+                    "elapsedTimeMetric": {}
+                },
+                "parameters": {
+                    "pl_param_folder": {
+                        "type": "string"
+                    },
+                    "pl_param_file": {
+                        "type": "string"
+                    }
+                },
+                "annotations": []
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/datasets/ds_blob')]",
+                "[concat(variables('factoryId'), '/datasets/ds_sqldb')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/tr_event')]",
+            "type": "Microsoft.DataFactory/factories/triggers",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "runtimeState": "Started",
+                "pipelines": [
+                    {
+                        "pipelineReference": {
+                            "referenceName": "pipeline1",
+                            "type": "PipelineReference"
+                        },
+                        "parameters": {
+                            "pl_param_folder": "[parameters('tr_event_properties_pipeline1_parameters_pl_param_folder')]",
+                            "pl_param_file": "[parameters('tr_event_properties_pipeline1_parameters_pl_param_file')]"
+                        }
+                    }
+                ],
+                "type": "BlobEventsTrigger",
+                "typeProperties": {
+                    "blobPathEndsWith": ".csv",
+                    "ignoreEmptyBlobs": true,
+                    "scope": "[parameters('tr_event_properties_typeProperties_scope')]",
+                    "events": [
+                        "Microsoft.Storage.BlobCreated"
+                    ]
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/pipelines/pipeline1')]"
+            ]
+        }
+    ]
+}

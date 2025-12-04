@@ -1,0 +1,39 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "factoryName": {
+            "value": "cloud-dev-adfws"
+        },
+        "ls_blob_connectionString": {
+            "value": ""
+        },
+        "ls_sqldb_password": {
+            "value": ""
+        },
+        "ls_sqldb_properties_typeProperties_server": {
+            "value": "cloudsqlserver01.database.windows.net"
+        },
+        "ls_sqldb_properties_typeProperties_database": {
+            "value": "cloudsqldb01"
+        },
+        "ls_sqldb_properties_typeProperties_userName": {
+            "value": "sebastian"
+        },
+        "tr_event_properties_pipeline1_parameters_pl_param_folder": {
+            "value": "@triggerBody().folderPath"
+        },
+        "tr_event_properties_pipeline1_parameters_pl_param_file": {
+            "value": "@triggerBody().fileName"
+        },
+        "tr_event_properties_typeProperties_scope": {
+            "value": "/subscriptions/fc48e5ac-7507-4f71-8257-3a3665196b7b/resourceGroups/cloud-dev-rs/providers/Microsoft.Storage/storageAccounts/clouddevblob"
+        },
+        "containerUri": {
+            "value": ""
+        },
+        "containerSasToken": {
+            "value": ""
+        }
+    }
+}
